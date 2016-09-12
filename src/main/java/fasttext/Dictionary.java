@@ -1,12 +1,6 @@
 package fasttext;
 
-import java.io.BufferedReader;
-import java.io.DataInputStream;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
+import java.io.*;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -21,7 +15,7 @@ import com.google.common.primitives.UnsignedInteger;
 
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 
-public class Dictionary {
+public class Dictionary implements Serializable{
 
 	private static Logger logger = Logger.getLogger(Dictionary.class);
 
@@ -59,7 +53,7 @@ public class Dictionary {
 		}
 	}
 
-	public class entry {
+	public class entry implements Serializable{
 		String word;
 		long count;
 		entry_type type;
@@ -98,7 +92,7 @@ public class Dictionary {
 
 	/**
 	 * String FNV-1a Hash
-	 * 
+	 *
 	 * @param str
 	 * @return
 	 */

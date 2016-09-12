@@ -7,7 +7,9 @@ import fasttext.Args.loss_name;
 import fasttext.Args.model_name;
 import com.google.common.base.Preconditions;
 
-public class Model {
+import java.io.Serializable;
+
+public class Model  implements Serializable {
 
 	static final int NEGATIVE_TABLE_SIZE = 10000000;
 	static final float MIN_LR = 0.000001f;
@@ -42,8 +44,8 @@ public class Model {
 
 	public Model(Args args, Matrix wi, Matrix wo, int hsz, float lr, int seed) {
 		this.args = args;
-		wi_ = new Matrix(wi);
-		wo_ = new Matrix(wo);
+		wi_ = wi;//new Matrix(wi);
+		wo_ = wo;//new Matrix(wo);
 		hidden_ = new Vector(hsz);
 		output_ = new Vector(wo.m_);
 		grad_ = new Vector(hsz);

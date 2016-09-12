@@ -3,6 +3,7 @@ package fasttext;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.Serializable;
 
 import org.apache.commons.math3.distribution.UniformRealDistribution;
 import org.apache.commons.math3.random.Well19937c;
@@ -10,7 +11,7 @@ import org.apache.log4j.Logger;
 
 import com.google.common.base.Preconditions;
 
-public class Matrix {
+public class Matrix  implements Serializable {
 
 	private static Logger logger = Logger.getLogger(Matrix.class);
 

@@ -3,8 +3,9 @@ package fasttext;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.Serializable;
 
-public class IOUtil {
+public class IOUtil  implements Serializable {
 
 	private static final int MAX_STRING_SIZE = 50;
 

@@ -1,17 +1,13 @@
 package fasttext;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.RandomAccess;
 
 import org.apache.commons.math3.random.RandomGenerator;
 
-public class Utils {
+public class Utils  implements Serializable {
 
 	static final int SIGMOID_TABLE_SIZE = 512;
 	static final int MAX_SIGMOID = 8;
@@ -92,7 +88,7 @@ public class Utils {
 	}
 
 	/**
-	 * 
+	 *
 	 * @param br
 	 * @param pos line numbers start from 1
 	 * @throws IOException

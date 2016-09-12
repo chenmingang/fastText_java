@@ -2,7 +2,9 @@ package fasttext;
 
 import com.google.common.base.Preconditions;
 
-public class Vector {
+import java.io.Serializable;
+
+public class Vector implements Serializable{
 
 	public int m_;
 	public float[] data_;
@@ -25,6 +27,9 @@ public class Vector {
 	}
 
 	public void addRow(final Matrix A, int i) {
+		if(i<0){
+			return;
+		}
 		Preconditions.checkArgument(i >= 0);
 		Preconditions.checkArgument(i < A.m_);
 		Preconditions.checkArgument(m_ == A.n_);
