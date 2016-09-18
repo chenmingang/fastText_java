@@ -105,12 +105,4 @@ public class Matrix  implements Serializable {
 			}
 		}
 	}
-
-	// Matrix& Matrix::operator=(const Matrix& other) {
-	// Matrix temp(other);
-	// m_ = temp.m_;
-	// n_ = temp.n_;
-	// std::swap(data_, temp.data_);
-	// return *this;
-	// }
 }

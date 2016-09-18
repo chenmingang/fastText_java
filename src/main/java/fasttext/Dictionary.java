@@ -19,7 +19,7 @@ public class Dictionary implements Serializable{
 
 	private static Logger logger = Logger.getLogger(Dictionary.class);
 
-	private static final int MAX_VOCAB_SIZE = 30000000;
+	private static final int MAX_VOCAB_SIZE = 10000000;
 	private static final int MAX_LINE_SIZE = 1024;
 
 	// private static final String EOS = "</s>";
@@ -105,33 +105,6 @@ public class Dictionary implements Serializable{
 		return UnsignedInteger.fromIntBits(h).longValue();
 	}
 
-	public void add(final String w) {
-		long h = find(w);
-		ntokens_++;
-		if (word2int_.get(h) == -1) {
-			entry e = new entry();
-			e.word = w;
-			e.count = 1;
-			e.type = w.contains(args.label) ? entry_type.label : entry_type.word;
-			words_.add(e);
-			word2int_.put(h, size_++);
-		} else {
-			words_.get(word2int_.get(h)).count++;
-		}
-	}
-
-	public int nwords() {
-		return nwords_;
-	}
-
-	public int nlabels() {
-		return nlabels_;
-	}
-
-	public long ntokens() {
-		return ntokens_;
-	}
-
 	public final Vector<Integer> getNgrams(int i) {
 		Preconditions.checkArgument(i >= 0);
 		Preconditions.checkArgument(i < nwords_);
@@ -152,12 +125,6 @@ public class Dictionary implements Serializable{
 	public int getId(final String w) {
 		long h = find(w);
 		return word2int_.get(h);
-	}
-
-	public String getWord(int id) {
-		Preconditions.checkArgument(id >= 0);
-		Preconditions.checkArgument(id < size_);
-		return words_.get(id).word;
 	}
 
 	public entry_type getType(int id) {
@@ -246,37 +213,6 @@ public class Dictionary implements Serializable{
 		return counts;
 	}
 
-	public void readFromFile(String file) throws IOException {
-		FileInputStream fis = new FileInputStream(file);
-		BufferedReader br = new BufferedReader(new InputStreamReader(fis, "UTF-8"));
-		try {
-			long minThreshold = 1;
-			String line;
-			while ((line = br.readLine()) != null) {
-				if (Utils.isEmpty(line) || line.startsWith("#")) {
-					continue;
-				}
-				String[] words = line.split("\\s+");
-				for (String word : words) {
-					add(word);
-					if (ntokens_ % 1000000 == 0) {
-						System.out.println("Read " + ntokens_ / 1000000 + "M words");
-					}
-					if (size_ > 0.75 * MAX_VOCAB_SIZE) {
-						threshold(minThreshold++);
-					}
-				}
-			}
-		} finally {
-			fis.close();
-			br.close();
-		}
-		System.out.println("\rRead " + ntokens_ / 1000000 + "M words");
-		threshold(args.minCount);
-		initTableDiscard();
-		initNgrams();
-	}
-
 	private transient Comparator<entry> entry_comparator = new Comparator<entry>() {
 		@Override
 		public int compare(entry o1, entry o2) {
@@ -287,29 +223,6 @@ public class Dictionary implements Serializable{
 			return cmp;
 		}
 	};
-
-	public void threshold(long t) {
-		Collections.sort(words_, entry_comparator);
-		Iterator<entry> iterator = words_.iterator();
-		while (iterator.hasNext()) {
-			entry _entry = iterator.next();
-			if (_entry.count < t) {
-				iterator.remove();
-			}
-		}
-		size_ = 0;
-		nwords_ = 0;
-		nlabels_ = 0;
-		word2int_.clear();
-		for (entry _entry : words_) {
-			long h = find(_entry.word);
-			word2int_.put(h, size_++);
-			if (_entry.type == entry_type.word)
-				nwords_++;
-			if (_entry.type == entry_type.label)
-				nlabels_++;
-		}
-	}
 
 	public void addNgrams(Vector<Integer> line, int n) {
 		int line_size = line.size();
@@ -350,22 +263,6 @@ public class Dictionary implements Serializable{
 		}
 		return ntokens;
 	}
-
-	public void save(OutputStream ofs) throws IOException {
-		ofs.write(IOUtil.intToByteArray(size_));
-		ofs.write(IOUtil.intToByteArray(nwords_));
-		ofs.write(IOUtil.intToByteArray(nlabels_));
-		ofs.write(IOUtil.longToByteArray(ntokens_));
-		// Charset charset = Charset.forName("UTF-8");
-		for (int i = 0; i < size_; i++) {
-			entry e = words_.get(i);
-			ofs.write(e.word.getBytes());
-			ofs.write(0);
-			ofs.write(IOUtil.longToByteArray(e.count));
-			ofs.write(e.type.value & 0xFF);
-		}
-	}
-
 	public void load(InputStream ifs) throws IOException {
 		words_.clear();
 		word2int_.clear();

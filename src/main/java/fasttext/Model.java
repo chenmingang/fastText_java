@@ -1,21 +1,19 @@
 package fasttext;
 
+import org.apache.commons.math3.distribution.UniformRealDistribution;
 import org.apache.commons.math3.random.RandomGenerator;
 import org.apache.commons.math3.random.Well19937c;
 
 import fasttext.Args.loss_name;
-import fasttext.Args.model_name;
 import com.google.common.base.Preconditions;
+import org.apache.log4j.Logger;
 
-import java.io.Serializable;
+import java.io.*;
 
 public class Model  implements Serializable {
 
+	private static Logger logger = Logger.getLogger(Model.class);
 	static final int NEGATIVE_TABLE_SIZE = 10000000;
-	static final float MIN_LR = 0.000001f;
-
-	private static float lr_ = MIN_LR;
-
 	public class Node {
 		int parent;
 		int left;
@@ -25,110 +23,98 @@ public class Model  implements Serializable {
 	}
 
 	private Args args;
+	Dictionary dict;
 
 	private Matrix wi_; // input
 	private Matrix wo_; // output
 	private Vector hidden_;
 	private Vector output_;
-	private Vector grad_;
-	private int hsz_; // dim
-	private int isz_; // input vocabSize
 	private int osz_; // output vocabSize
 	private java.util.Vector<Integer> negatives;
-	private int negpos;
 	private java.util.Vector<java.util.Vector<Integer>> paths;
 	private java.util.Vector<java.util.Vector<Boolean>> codes;
 	private java.util.Vector<Node> tree;
 
 	public RandomGenerator rng;
-
-	public Model(Args args, Matrix wi, Matrix wo, int hsz, float lr, int seed) {
-		this.args = args;
-		wi_ = wi;//new Matrix(wi);
-		wo_ = wo;//new Matrix(wo);
-		hidden_ = new Vector(hsz);
-		output_ = new Vector(wo.m_);
-		grad_ = new Vector(hsz);
-		rng = new Well19937c(seed);
-		isz_ = wi.m_;
-		osz_ = wo.m_;
-		hsz_ = hsz;
-		lr_ = lr;
-		negpos = 0;
+	public Model() {
+		args = new Args();
+		dict = new Dictionary(args);
+		wi_ = new Matrix();
+		wo_ = new Matrix();
 	}
-
-	public void setLearningRate(float lr) {
-		lr_ = (lr < MIN_LR) ? MIN_LR : lr;
-	}
-
-	public float getLearningRate() {
-		return lr_;
-	}
-
-	public float binaryLogistic(int target, boolean label) {
-		float score = Utils.sigmoid(wo_.dotRow(hidden_, target));
-		float alpha = lr_ * (label ? 1.0f : 0.0f - score);
-		grad_.addRow(wo_, target, alpha);
-		wo_.addRow(hidden_, target, alpha);
-		if (label) {
-			return -Utils.log(score);
-		} else {
-			return -Utils.log((float) (1.0 - score));
-		}
-	}
-
-	public float negativeSampling(int target) {
-		float loss = 0.0f;
-		grad_.zero();
-		for (int n = 0; n <= args.neg; n++) {
-			if (n == 0) {
-				loss += binaryLogistic(target, true);
-			} else {
-				loss += binaryLogistic(getNegative(target), false);
+	public void loadModel(String filename) throws IOException {
+		DataInputStream dis = null;
+		BufferedInputStream bis = null;
+		try {
+			File file = new File(filename);
+			if (!(file.exists() && file.isFile() && file.canRead())) {
+				throw new IOException("Model file cannot be opened for loading!");
 			}
-		}
-		return loss;
-	}
+			bis = new BufferedInputStream(new FileInputStream(file));
+			dis = new DataInputStream(bis);
 
-	public float hierarchicalSoftmax(int target) {
-		float loss = 0.0f;
-		grad_.zero();
-		final java.util.Vector<Boolean> binaryCode = codes.get(target);
-		final java.util.Vector<Integer> pathToRoot = paths.get(target);
-		for (int i = 0; i < pathToRoot.size(); i++) {
-			loss += binaryLogistic(pathToRoot.get(i), binaryCode.get(i));
-		}
-		return loss;
-	}
+			args.load(dis);
+			dict.load(dis);
+			wi_.load(dis);
+			wo_.load(dis);
 
-	public float softmax(int target) {
-		grad_.zero();
-		output_.mul(wo_, hidden_);
-		float max = 0.0f, z = 0.0f;
-		for (int i = 0; i < osz_; i++) {
-			max = Math.max(output_.get(i), max);
-		}
-		for (int i = 0; i < osz_; i++) {
-			output_.set(i, (float) Math.exp(output_.get(i) - max));
-			z += output_.get(i);
-		}
-		for (int i = 0; i < osz_; i++) {
-			float label = (i == target) ? 1.0f : 0.0f;
-			output_.set(i, output_.get(i) / z);
-			float alpha = lr_ * (label - output_.get(i));
-			grad_.addRow(wo_, i, alpha);
-			wo_.addRow(hidden_, i, alpha);
-		}
-		return -Utils.log(output_.get(target));
-	}
 
-	public int getNegative(int target) {
-		int negative;
-		do {
-			negative = negatives.get(negpos);
-			negpos = (negpos + 1) % negatives.size();
-		} while (target == negative);
-		return negative;
+			hidden_ = new Vector(args.dim);
+			output_ = new Vector(wo_.m_);
+			rng = new Well19937c(1);
+			osz_ = wo_.m_;
+
+			logger.info("loadModel done!");
+		} finally {
+			bis.close();
+			dis.close();
+		}
+	}
+	public void predict(String filename) throws IOException {
+		java.util.Vector<Integer> line = new java.util.Vector<Integer>();
+		java.util.Vector<Integer> labels = new java.util.Vector<Integer>();
+
+		File file = new File(filename);
+		if (!(file.exists() && file.isFile() && file.canRead())) {
+			throw new IOException("Test file cannot be opened!");
+		}
+		UniformRealDistribution urd = new UniformRealDistribution(this.rng, 0, 1);
+		FileInputStream fis = new FileInputStream(file);
+		BufferedReader dis = new BufferedReader(new InputStreamReader(fis, "UTF-8"));
+		try {
+			String lineString;
+			while ((lineString = dis.readLine()) != null) {
+				dict.getLine(lineString, line, labels, urd);
+				dict.addNgrams(line, args.wordNgrams);
+				if (line.size() > 0) {
+					int i = this.predict(line);
+					System.out.println(lineString + "\t" + dict.getLabel(i));
+				} else {
+					System.out.println(lineString + "\tn/a");
+				}
+			}
+		} finally {
+			dis.close();
+			fis.close();
+		}
+	}
+	public String predictStr(String str) throws IOException {
+		java.util.Vector<Integer> line = new java.util.Vector<Integer>();
+		java.util.Vector<Integer> labels = new java.util.Vector<Integer>();
+
+		UniformRealDistribution urd = new UniformRealDistribution(this.rng, 0, 1);
+
+		String lineString = str;
+		dict.getLine(lineString, line, labels, urd);
+		dict.addNgrams(line, args.wordNgrams);
+		if (line.size() > 0) {
+			int i = this.predict(line);
+			System.out.println(lineString + "\t" + dict.getLabel(i));
+			return dict.getLabel(i);
+		} else {
+			System.out.println(lineString + "\tn/a");
+			return null;
+		}
 	}
 
 	public int predict(final java.util.Vector<Integer> input) {
@@ -141,7 +127,7 @@ public class Model  implements Serializable {
 		if (args.loss == loss_name.hs) {
 			float max = -1e10f;
 			int argmax = -1;
-			dfs(2 * osz_ - 2, 0.0f, max, argmax);
+			dfs(2 * osz_ - 2, 0.0f, max);
 			return argmax;
 		} else {
 			output_.mul(wo_, hidden_);
@@ -149,17 +135,15 @@ public class Model  implements Serializable {
 		}
 	}
 
-	public void dfs(int node, float score, float max, int argmax) {
+	public void dfs(int node, float score, float max) {
 		if (score < max)
 			return;
 		if (tree.get(node).left == -1 && tree.get(node).right == -1) {
-			max = score;
-			argmax = node;
 			return;
 		}
 		float f = Utils.sigmoid(wo_.dotRow(hidden_, node - osz_));
-		dfs(tree.get(node).left, score + Utils.log(1.0f - f), max, argmax);
-		dfs(tree.get(node).right, score + Utils.log(f), max, argmax);
+		dfs(tree.get(node).left, score + Utils.log(1.0f - f), max);
+		dfs(tree.get(node).right, score + Utils.log(f), max);
 	}
 
 	public void initTableNegatives(final java.util.Vector<Long> counts) {
@@ -177,36 +161,8 @@ public class Model  implements Serializable {
 		Utils.shuffle(negatives, rng);
 	}
 
-	public float update(final java.util.Vector<Integer> input, int target) {
-		Preconditions.checkArgument(target >= 0);
-		Preconditions.checkArgument(target < osz_);
-		if (input.size() == 0)
-			return 0.0f;
-		hidden_.zero();
-		for (Integer it : input) {
-			hidden_.addRow(wi_, it);
-		}
-		hidden_.mul((float) (1.0 / input.size()));
-
-		float loss;
-		if (args.loss == loss_name.ns) {
-			loss = negativeSampling(target);
-		} else if (args.loss == loss_name.hs) {
-			loss = hierarchicalSoftmax(target);
-		} else {
-			loss = softmax(target);
-		}
-
-		if (args.model == model_name.sup) {
-			grad_.mul((float) (1.0 / input.size()));
-		}
-		for (Integer it : input) {
-			wi_.addRow(grad_, it, 1.0f);
-		}
-		return loss;
-	}
-
-	public void setTargetCounts(final java.util.Vector<Long> counts) {
+	public void setTargetCounts() {
+		java.util.Vector<Long> counts = dict.getCounts(Dictionary.entry_type.label);
 		Preconditions.checkArgument(counts.size() == osz_);
 		if (args.loss == loss_name.ns) {
 			initTableNegatives(counts);
