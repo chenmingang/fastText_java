@@ -28,7 +28,7 @@ public class Model  implements Serializable {
 	private Matrix wi_; // input
 	private Matrix wo_; // output
 	private Vector hidden_;
-	private Vector output_;
+//	private Vector output_;
 	private int osz_; // output vocabSize
 	private java.util.Vector<Integer> negatives;
 	private java.util.Vector<java.util.Vector<Integer>> paths;
@@ -60,7 +60,7 @@ public class Model  implements Serializable {
 
 
 			hidden_ = new Vector(args.dim);
-			output_ = new Vector(wo_.m_);
+//			output_ = new Vector(wo_.m_);
 			rng = new Well19937c(1);
 			osz_ = wo_.m_;
 
@@ -117,7 +117,9 @@ public class Model  implements Serializable {
 		}
 	}
 
-	public int predict(final java.util.Vector<Integer> input) {
+	private int predict(final java.util.Vector<Integer> input) {
+		Vector hidden_ = new Vector(args.dim);
+		Vector output_ = new Vector(wo_.m_);
 		hidden_.zero();
 		for (Integer it : input) {
 			hidden_.addRow(wi_, it);
